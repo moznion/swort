@@ -18,30 +18,9 @@ type Slice[IT any, ST cmp.Ordered] struct {
 }
 
 func MakeSlice[IT any, ST cmp.Ordered](items []IT, sortValueExtractor func(item IT) ST) *Slice[IT, ST] {
-	sortValues := make([]ST, 0, len(items))
-	sortValue2Item := map[ST][]IT{}
-	originalSortValue2Idx := map[ST]int{}
-
-	for i, item := range items {
-		sortVal := sortValueExtractor(item)
-
-		gotItems, ok := sortValue2Item[sortVal]
-		if !ok {
-			sortValues = append(sortValues, sortVal)
-			sortValue2Item[sortVal] = []IT{item}
-			originalSortValue2Idx[sortVal] = i
-			continue
-		}
-
-		sortValue2Item[sortVal] = append(gotItems, item)
-	}
-
 	return &Slice[IT, ST]{
-		sortValues:            sortValues,
-		sortValue2Item:        sortValue2Item,
-		originalSortValue2Idx: originalSortValue2Idx,
-		items:                 items,
-		sortValueExtractor:    sortValueExtractor,
+		items:              items,
+		sortValueExtractor: sortValueExtractor,
 	}
 }
 
@@ -50,6 +29,8 @@ func (s *Slice[IT, ST]) Len() int {
 }
 
 func (s *Slice[IT, ST]) SearchFromOriginal(item IT) (int, bool) {
+	s.initialize()
+
 	idx, ok := s.originalSortValue2Idx[s.sortValueExtractor(item)]
 	if !ok {
 		idx = s.Len()
@@ -95,6 +76,8 @@ func (s *Slice[IT, ST]) sortByAsc() []IT {
 		return ascSorted
 	}
 
+	s.initialize()
+
 	slices.Sort(s.sortValues)
 
 	s.ascSortValue2Idx = make(map[ST]int)
@@ -137,4 +120,32 @@ func (s *Slice[IT, ST]) sortByDesc() []IT {
 	}
 
 	return s.descSortedItems
+}
+
+func (s *Slice[IT, ST]) initialize() {
+	if s.originalSortValue2Idx != nil {
+		return
+	}
+
+	sortValues := make([]ST, 0, len(s.items))
+	sortValue2Item := map[ST][]IT{}
+	originalSortValue2Idx := map[ST]int{}
+
+	for i, item := range s.items {
+		sortVal := s.sortValueExtractor(item)
+
+		gotItems, ok := sortValue2Item[sortVal]
+		if !ok {
+			sortValues = append(sortValues, sortVal)
+			sortValue2Item[sortVal] = []IT{item}
+			originalSortValue2Idx[sortVal] = i
+			continue
+		}
+
+		sortValue2Item[sortVal] = append(gotItems, item)
+	}
+
+	s.sortValues = sortValues
+	s.sortValue2Item = sortValue2Item
+	s.originalSortValue2Idx = originalSortValue2Idx
 }
