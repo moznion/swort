@@ -25,8 +25,8 @@ func TestSlice_SortByAsc(t *testing.T) {
 		return s.intValue
 	})
 
-	assert.EqualValues(t, []Struct{{intValue: 1}, {intValue: 2}, {intValue: 3}, {intValue: 4}, {intValue: 5}, {intValue: 5}, {intValue: 6}}, slice.SortByAsc(), "should be sorted by ASC")
-	assert.EqualValues(t, []Struct{{intValue: 1}, {intValue: 2}, {intValue: 3}, {intValue: 4}, {intValue: 5}, {intValue: 5}, {intValue: 6}}, slice.SortByAsc(), "should be sorted by ASC; check for retrieval from cache")
+	assert.EqualValues(t, []Struct{{intValue: 1}, {intValue: 2}, {intValue: 3}, {intValue: 4}, {intValue: 5}, {intValue: 5}, {intValue: 6}}, slice.SortByAsc().Items, "should be sorted by ASC")
+	assert.EqualValues(t, slice.SortByAsc(), slice.SortByAsc(), "should be sorted by ASC; check for retrieval from cache")
 	assert.EqualValues(t, []Struct{{intValue: 5}, {intValue: 2}, {intValue: 6}, {intValue: 3}, {intValue: 1}, {intValue: 5}, {intValue: 4}}, given, "should given be immutable")
 }
 
@@ -36,8 +36,8 @@ func TestSlice_SortByDesc(t *testing.T) {
 		return s.intValue
 	})
 
-	assert.EqualValues(t, []Struct{{intValue: 6}, {intValue: 5}, {intValue: 5}, {intValue: 4}, {intValue: 3}, {intValue: 2}, {intValue: 1}}, slice.SortByDesc(), "should be sorted by Desc")
-	assert.EqualValues(t, []Struct{{intValue: 6}, {intValue: 5}, {intValue: 5}, {intValue: 4}, {intValue: 3}, {intValue: 2}, {intValue: 1}}, slice.SortByDesc(), "should be sorted by Desc, check for retrieval from cache")
+	assert.EqualValues(t, []Struct{{intValue: 6}, {intValue: 5}, {intValue: 5}, {intValue: 4}, {intValue: 3}, {intValue: 2}, {intValue: 1}}, slice.SortByDesc().Items, "should be sorted by Desc")
+	assert.EqualValues(t, slice.SortByDesc(), slice.SortByDesc(), "should be sorted by Desc, check for retrieval from cache")
 	assert.EqualValues(t, []Struct{{intValue: 5}, {intValue: 2}, {intValue: 6}, {intValue: 3}, {intValue: 1}, {intValue: 5}, {intValue: 4}}, given, "should given be immutable")
 }
 
@@ -146,8 +146,9 @@ func TestSlice_SearchFromSortedByAsc(t *testing.T) {
 		},
 	}
 
+	sortedByAsc := slice.SortByAsc()
 	for _, tc := range testCases {
-		got, ok := slice.SearchFromSortedByAsc(Struct{intValue: tc.intValue})
+		got, ok := sortedByAsc.Search(Struct{intValue: tc.intValue})
 		assert.Equal(t, got, tc.expectedIdx)
 		assert.Equal(t, ok, tc.expectedOK)
 	}
@@ -202,8 +203,9 @@ func TestSlice_SearchFromSortedByDesc(t *testing.T) {
 		},
 	}
 
+	sortedByDesc := slice.SortByDesc()
 	for _, tc := range testCases {
-		got, ok := slice.SearchFromSortedByDesc(Struct{intValue: tc.intValue})
+		got, ok := sortedByDesc.Search(Struct{intValue: tc.intValue})
 		assert.Equal(t, got, tc.expectedIdx)
 		assert.Equal(t, ok, tc.expectedOK)
 	}

@@ -10,11 +10,9 @@ type Slice[IT any, ST cmp.Ordered] struct {
 	sortValue2Item        map[ST][]IT
 	items                 []IT
 	originalSortValue2Idx map[ST]int
-	ascSortedItems        []IT
-	descSortValue2Idx     map[ST]int
-	descSortedItems       []IT
-	ascSortValue2Idx      map[ST]int
 	sortValueExtractor    func(item IT) ST
+	sortedByAsc           *Sorted[IT, ST]
+	sortedByDesc          *Sorted[IT, ST]
 }
 
 func MakeSlice[IT any, ST cmp.Ordered](items []IT, sortValueExtractor func(item IT) ST) *Slice[IT, ST] {
@@ -29,7 +27,7 @@ func (s *Slice[IT, ST]) Len() int {
 }
 
 func (s *Slice[IT, ST]) SearchFromOriginal(item IT) (int, bool) {
-	s.initialize()
+	s.initializeIfNeeded()
 
 	idx, ok := s.originalSortValue2Idx[s.sortValueExtractor(item)]
 	if !ok {
@@ -39,90 +37,75 @@ func (s *Slice[IT, ST]) SearchFromOriginal(item IT) (int, bool) {
 
 }
 
-func (s *Slice[IT, ST]) SearchFromSortedByAsc(item IT) (int, bool) {
-	if s.ascSortValue2Idx == nil {
-		s.sortByAsc()
-	}
-
-	idx, ok := s.ascSortValue2Idx[s.sortValueExtractor(item)]
-	if !ok {
-		idx = s.Len()
-	}
-	return idx, ok
-}
-
-func (s *Slice[IT, ST]) SearchFromSortedByDesc(item IT) (int, bool) {
-	if s.descSortValue2Idx == nil {
-		s.sortByDesc()
-	}
-
-	idx, ok := s.descSortValue2Idx[s.sortValueExtractor(item)]
-	if !ok {
-		idx = s.Len()
-	}
-	return idx, ok
-}
-
-func (s *Slice[IT, ST]) SortByAsc() []IT {
+func (s *Slice[IT, ST]) SortByAsc() *Sorted[IT, ST] {
 	return s.sortByAsc()
 }
 
-func (s *Slice[IT, ST]) SortByDesc() []IT {
-	return s.sortByDesc()
-}
-
-func (s *Slice[IT, ST]) sortByAsc() []IT {
-	if ascSorted := s.ascSortedItems; ascSorted != nil {
-		return ascSorted
+func (s *Slice[IT, ST]) SortByDesc() *Sorted[IT, ST] {
+	if sortedByDesc := s.sortedByDesc; sortedByDesc != nil {
+		return sortedByDesc
 	}
 
-	s.initialize()
+	sortedByAsc := s.sortByAsc()
+	l := len(sortedByAsc.Items)
 
-	slices.Sort(s.sortValues)
-
-	s.ascSortValue2Idx = make(map[ST]int)
-	s.ascSortedItems = make([]IT, 0, len(s.items))
-	idx := 0
-	for _, sortValue := range s.sortValues {
-		for _, item := range s.sortValue2Item[sortValue] {
-			s.ascSortedItems = append(s.ascSortedItems, item)
-
-			if _, ok := s.ascSortValue2Idx[sortValue]; !ok {
-				s.ascSortValue2Idx[sortValue] = idx
-			}
-			idx++
-		}
-	}
-
-	return s.ascSortedItems
-}
-
-func (s *Slice[IT, ST]) sortByDesc() []IT {
-	if descSorted := s.descSortedItems; descSorted != nil {
-		return descSorted
-	}
-
-	ascSorted := s.sortByAsc()
-	l := len(ascSorted)
-
-	s.descSortValue2Idx = make(map[ST]int)
-	s.descSortedItems = make([]IT, l)
+	descSortValue2Idx := make(map[ST]int)
+	descSortedItems := make([]IT, l)
 	idx := 0
 	for i := l - 1; i >= 0; i-- {
-		s.descSortedItems[idx] = ascSorted[i]
+		item := sortedByAsc.Items[i]
 
-		sortValue := s.sortValueExtractor(ascSorted[i])
-		if _, ok := s.descSortValue2Idx[sortValue]; !ok {
-			s.descSortValue2Idx[sortValue] = idx
+		descSortedItems[idx] = item
+		sortValue := s.sortValueExtractor(item)
+		if _, ok := descSortValue2Idx[sortValue]; !ok {
+			descSortValue2Idx[sortValue] = idx
 		}
 
 		idx++
 	}
 
-	return s.descSortedItems
+	sortedByDesc := &Sorted[IT, ST]{
+		Items:              descSortedItems,
+		sortValue2Idx:      descSortValue2Idx,
+		sortValueExtractor: s.sortValueExtractor,
+	}
+	s.sortedByDesc = sortedByDesc
+	return sortedByDesc
 }
 
-func (s *Slice[IT, ST]) initialize() {
+func (s *Slice[IT, ST]) sortByAsc() *Sorted[IT, ST] {
+	if sortedByAsc := s.sortedByAsc; sortedByAsc != nil {
+		return sortedByAsc
+	}
+
+	s.initializeIfNeeded()
+
+	slices.Sort(s.sortValues)
+
+	ascSortValue2Idx := make(map[ST]int)
+	ascSortedItems := make([]IT, 0, len(s.items))
+	idx := 0
+	for _, sortValue := range s.sortValues {
+		for _, item := range s.sortValue2Item[sortValue] {
+			ascSortedItems = append(ascSortedItems, item)
+
+			if _, ok := ascSortValue2Idx[sortValue]; !ok {
+				ascSortValue2Idx[sortValue] = idx
+			}
+			idx++
+		}
+	}
+
+	sortedByAsc := &Sorted[IT, ST]{
+		Items:              ascSortedItems,
+		sortValue2Idx:      ascSortValue2Idx,
+		sortValueExtractor: s.sortValueExtractor,
+	}
+	s.sortedByAsc = sortedByAsc
+	return sortedByAsc
+}
+
+func (s *Slice[IT, ST]) initializeIfNeeded() {
 	if s.originalSortValue2Idx != nil {
 		return
 	}
@@ -148,4 +131,18 @@ func (s *Slice[IT, ST]) initialize() {
 	s.sortValues = sortValues
 	s.sortValue2Item = sortValue2Item
 	s.originalSortValue2Idx = originalSortValue2Idx
+}
+
+type Sorted[IT any, ST cmp.Ordered] struct {
+	Items              []IT
+	sortValue2Idx      map[ST]int
+	sortValueExtractor func(item IT) ST
+}
+
+func (sd *Sorted[IT, ST]) Search(item IT) (int, bool) {
+	idx, ok := sd.sortValue2Idx[sd.sortValueExtractor(item)]
+	if !ok {
+		idx = len(sd.Items)
+	}
+	return idx, ok
 }
